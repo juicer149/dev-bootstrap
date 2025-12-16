@@ -8,7 +8,8 @@ Architecture
 ------------
 - This file defines a *single facade* (`Setup`) that exposes a small,
   stable API to Bash.
-- Bash selects *what* to run (tree | env | projects | all).
+- Bash selects *what* to run
+  (tree | shell | editor | terminal | env | projects | all).
 - Python encapsulates *how* it is done.
 
 Design principles
@@ -16,6 +17,7 @@ Design principles
 - No CLI parsing (no argparse, flags, or subcommands)
 - No persistent state
 - No configuration language (config is plain Python data)
+- Explicit opt-in for install hooks
 - Idempotent operations where possible
 
 This is NOT:
@@ -28,18 +30,6 @@ This IS:
 - safe to run multiple times
 - safe to delete and re-run after wiping ~/dev
 
-Extension model
----------------
-Repositories may optionally provide a file named:
-
-    dev-bootstrap.install.sh
-
-If present, this script will be executed after the repository
-has been cloned (or re-visited on subsequent runs).
-
-Presence of this file is an explicit opt-in contract.
-Bootstrap will never attempt to guess or infer intent.
-
 If this file grows:
 - new steps go behind new `Setup.<action>()` methods
 - the Bash interface must remain unchanged
@@ -48,6 +38,10 @@ If this file grows:
 from pathlib import Path
 import subprocess
 import sys
+
+# ========== CONSTANTS ==========
+
+BOOTSTRAP_INSTALL_SCRIPT = "dev-bootstrap.install.sh"
 
 # ========= CONFIG (MVP) =========
 #
@@ -58,28 +52,41 @@ import sys
 #   Values are lists of subdirectories to create.
 #
 # - To add git repositories:
-#   Add entries to ENV_REPOS or PROJECT_REPOS.
+#   Add entries to *_REPOS mappings.
 #   Keys are destination paths.
 #   Values are git clone URLs.
+#
+# Repositories may optionally provide:
+#   dev-bootstrap.install.sh
+# This script is executed ONLY if the repository was cloned
+# during the current bootstrap run.
 #
 # No other parts of this file need to be modified.
 
 DEV = Path.home() / "dev"
-# DEV = Path.home() / "test_dev"  # For testing purposes
+# DEV = Path.home() / "test_dev"  # for testing
 
+# Directory tree structure
 TREE = {
-    "env": ["editor", "terminal"],
+    "env": ["shell", "editor", "terminal"],
     "project": ["packages", "sandbox"],
     "tools": [],
 }
 
-ENV_REPOS = {
+# Environment repositories
+EDITOR_REPOS = {
     DEV / "env/editor/nvim": "git@github.com:lalrak/nvim-config.git",
+}
+
+TERMINAL_REPOS = {
     DEV / "env/terminal/wezterm": "git@github.com:lalrak/wezterm-config.git",
 }
 
+# Project repositories
 PROJECT_REPOS = {
     DEV / "project/packages/curate": "git@github.com:juicer149/curate.git",
+    DEV / "project/packages/architech": "git@github.com:juicer149/architech.git",
+    # add more project repos here
 }
 
 # ========= LOW-LEVEL MECHANISMS =========
@@ -90,15 +97,31 @@ def _mkdir(path: Path) -> None:
     print(f"[dir] {path}")
 
 
+def _git_clone(url: str, dest: Path) -> bool:
+    """
+    Clone a git repository if it does not already exist.
+
+    Returns True if the repository was cloned during this call,
+    False if it already existed.
+    """
+    if dest.exists() and (dest / ".git").exists():
+        print(f"[=] exists {dest}")
+        return False
+
+    subprocess.run(
+        ["git", "clone", url, str(dest)],
+        check=True,
+    )
+    return True
+
+
 def _run_bootstrap_install(repo: Path) -> None:
     """
     Run dev-bootstrap.install.sh if the repository provides it.
 
-    This is an explicit opt-in mechanism:
-    - if the file exists, it will be executed
-    - if not, nothing happens
+    Presence of the file is an explicit opt-in.
     """
-    script = repo / "dev-bootstrap.install.sh"
+    script = repo / BOOTSTRAP_INSTALL_SCRIPT
 
     if not script.exists():
         print(f"[=] no bootstrap install for {repo.name}")
@@ -111,24 +134,25 @@ def _run_bootstrap_install(repo: Path) -> None:
     )
 
 
-def _git_clone(url: str, dest: Path) -> None:
+def _process_repos(
+    repos: dict[Path, str],
+    label: str,
+    *,
+    enabled: bool = True,
+) -> None:
     """
-    Clone a git repository if missing.
+    Clone repositories and run bootstrap install hooks.
 
-    If the destination already exists and appears to be a git repository,
-    cloning is skipped but bootstrap install (if present) is still executed.
+    If enabled=False, the step is acknowledged but skipped.
     """
-    if dest.exists() and (dest / ".git").exists():
-        print(f"[=] exists {dest}")
-        _run_bootstrap_install(dest)
+    if not enabled:
+        print(f"[{label}] not implemented yet")
         return
 
-    subprocess.run(
-        ["git", "clone", url, str(dest)],
-        check=True,
-    )
-
-    _run_bootstrap_install(dest)
+    for path, url in repos.items():
+        cloned = _git_clone(url, path)
+        if cloned:
+            _run_bootstrap_install(path)
 
 
 def _ensure_tree() -> None:
@@ -137,6 +161,7 @@ def _ensure_tree() -> None:
         _mkdir(base)
         for child in children:
             _mkdir(base / child)
+
 
 # ========= FACADE =========
 # This is the *only* surface exposed to Bash.
@@ -153,26 +178,48 @@ class Setup:
         _ensure_tree()
 
     @staticmethod
-    def env() -> None:
+    def shell() -> None:
         _ensure_tree()
-        for path, url in ENV_REPOS.items():
-            _git_clone(url, path)
+        _process_repos({}, "shell", enabled=False)
+
+    @staticmethod
+    def editor() -> None:
+        _ensure_tree()
+        _process_repos(EDITOR_REPOS, "editor")
+
+    @staticmethod
+    def terminal() -> None:
+        _ensure_tree()
+        _process_repos(TERMINAL_REPOS, "terminal", enabled=False)
+
+    @staticmethod
+    def env() -> None:
+        """
+        High-level environment setup.
+        Order matters.
+        """
+        Setup.shell()
+        Setup.editor()
+        Setup.terminal()
 
     @staticmethod
     def projects() -> None:
         _ensure_tree()
-        for path, url in PROJECT_REPOS.items():
-            _git_clone(url, path)
+        _process_repos(PROJECT_REPOS, "projects")
 
     @staticmethod
     def all() -> None:
         Setup.env()
         Setup.projects()
 
+
 # ========= DISPATCH =========
 
 ACTIONS = {
     "tree": Setup.tree,
+    "shell": Setup.shell,
+    "editor": Setup.editor,
+    "terminal": Setup.terminal,
     "env": Setup.env,
     "projects": Setup.projects,
     "all": Setup.all,
@@ -182,7 +229,10 @@ ACTIONS = {
 
 def main() -> None:
     if len(sys.argv) != 2:
-        print("usage: setup.py [tree|env|projects|all]")
+        print(
+            "usage: setup.py "
+            "[tree|shell|editor|terminal|env|projects|all]"
+        )
         sys.exit(1)
 
     action = sys.argv[1]
@@ -193,8 +243,10 @@ def main() -> None:
 
     try:
         ACTIONS[action]()
-    except Exception:
+    except subprocess.CalledProcessError as e:
+        print(f"[error] command '{action}' failed: {e}")
         sys.exit(1)
+
 
 if __name__ == "__main__":
     main()

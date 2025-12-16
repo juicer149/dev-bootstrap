@@ -2,31 +2,49 @@
 
 Minimal bootstrap for my development environment.
 
-This repository contains a small, explicit entrypoint for setting up
-my local `~/dev` workspace and cloning a handful of core repositories.
+This repository provides a small, explicit entrypoint for creating a
+repeatable `~/dev` workspace and cloning a curated set of repositories.
+
+This is intentionally **not** a general-purpose tool.
+
+---
 
 ## Why this exists
 
 - I want a repeatable way to recreate my development environment
-- I do not want a framework, tool, or configuration system
+- I do not want a framework, toolchain, or configuration system
 - I want something safe to re-run and easy to delete and rebuild
 
-This repo encodes a *procedure*, not a general solution.
+This repository encodes a **procedure**, not a solution.
+
+---
 
 ## How it works
 
-- `bootstrap.sh` is the entrypoint
-  - ensures required system dependencies exist
+- `bootstrap.sh` is the stable entrypoint
+  - ensures required system dependencies exist (git, python)
   - selects *what* step to run
-- `setup.py` contains all setup logic
+- `setup.py` contains all implementation logic
   - defines *how* each step is performed
 
 The Bash interface is considered stable.  
-All implementation details live in Python.
+All behavior and customization lives in Python.
 
-## Repository installs (opt-in)
+The workspace root defaults to:
 
-Repositories cloned by this bootstrap may optionally provide a file named:
+```
+
+~/dev
+
+```
+
+and is defined in `setup.py` as `DEV`.
+
+---
+
+## Repository installs (explicit opt-in)
+
+Repositories cloned by this bootstrap **may optionally** provide a file named:
 
 ```
 
@@ -34,15 +52,22 @@ dev-bootstrap.install.sh
 
 ````
 
-If present, this script will be executed after the repository is cloned
-(or revisited on subsequent runs).
+If present, this script is executed **only when the repository is cloned
+during the current bootstrap run**.
 
-This is an **explicit opt-in mechanism**:
-- no guessing
-- no conventions
-- no automatic installs without consent
+Important properties:
 
-Repositories without this file are only cloned.
+- Explicit opt-in only
+- No guessing
+- No conventions
+- No implicit installs
+- Existing repositories are **never** re-installed automatically
+
+Repositories without this file are cloned only.
+
+Each repository fully controls its own installation behavior.
+
+---
 
 ## Usage
 
@@ -53,27 +78,74 @@ chmod +x bootstrap.sh
 ./bootstrap.sh
 ````
 
-Run specific steps:
+---
+
+## Available actions
 
 ```bash
 ./bootstrap.sh tree
+```
+
+Create directory structure only.
+
+```bash
+./bootstrap.sh shell
+```
+
+Shell environment setup (currently a stub).
+
+```bash
+./bootstrap.sh editor
+```
+
+Editor setup (e.g. Neovim).
+
+```bash
+./bootstrap.sh terminal
+```
+
+Terminal setup (currently a stub).
+
+```bash
 ./bootstrap.sh env
+```
+
+Run shell → editor → terminal in order.
+
+```bash
 ./bootstrap.sh projects
 ```
+
+Clone project repositories.
+
+```bash
+./bootstrap.sh all
+```
+
+Run `env` followed by `projects`.
+
+---
 
 ## Customization
 
 All customization lives in `setup.py`.
 
 * Directory structure is defined in `TREE`
-* Git repositories are defined in `ENV_REPOS` and `PROJECT_REPOS`
+* Repositories are defined in:
 
-To add or remove repositories or folders, edit those mappings directly.
+  * `EDITOR_REPOS`
+  * `TERMINAL_REPOS`
+  * `PROJECT_REPOS`
+
+To add or remove repositories or folders, edit these mappings directly.
 No other files need to be changed.
 
-## Notes
+---
+
+## Design notes
 
 * Safe to run multiple times
 * Safe to delete `~/dev` and re-run
+* No persistent state
 * Repositories control their own installation
 * Intentionally boring by design
