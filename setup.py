@@ -28,6 +28,18 @@ This IS:
 - safe to run multiple times
 - safe to delete and re-run after wiping ~/dev
 
+Extension model
+---------------
+Repositories may optionally provide a file named:
+
+    dev-bootstrap.install.sh
+
+If present, this script will be executed after the repository
+has been cloned (or re-visited on subsequent runs).
+
+Presence of this file is an explicit opt-in contract.
+Bootstrap will never attempt to guess or infer intent.
+
 If this file grows:
 - new steps go behind new `Setup.<action>()` methods
 - the Bash interface must remain unchanged
@@ -52,8 +64,8 @@ import sys
 #
 # No other parts of this file need to be modified.
 
-#DEV = Path.home() / "dev"
-DEV = Path.home() / "test_dev"  # For testing purposes
+DEV = Path.home() / "dev"
+# DEV = Path.home() / "test_dev"  # For testing purposes
 
 TREE = {
     "env": ["editor", "terminal"],
@@ -70,7 +82,6 @@ PROJECT_REPOS = {
     DEV / "project/packages/curate": "git@github.com:juicer149/curate.git",
 }
 
-
 # ========= LOW-LEVEL MECHANISMS =========
 # These functions implement mechanisms, not policy.
 
@@ -79,16 +90,45 @@ def _mkdir(path: Path) -> None:
     print(f"[dir] {path}")
 
 
+def _run_bootstrap_install(repo: Path) -> None:
+    """
+    Run dev-bootstrap.install.sh if the repository provides it.
+
+    This is an explicit opt-in mechanism:
+    - if the file exists, it will be executed
+    - if not, nothing happens
+    """
+    script = repo / "dev-bootstrap.install.sh"
+
+    if not script.exists():
+        print(f"[=] no bootstrap install for {repo.name}")
+        return
+
+    print(f"[run] bootstrap install for {repo.name}")
+    subprocess.run(
+        ["bash", str(script)],
+        check=True,
+    )
+
+
 def _git_clone(url: str, dest: Path) -> None:
-    # Only skip if this actually looks like a git repository
+    """
+    Clone a git repository if missing.
+
+    If the destination already exists and appears to be a git repository,
+    cloning is skipped but bootstrap install (if present) is still executed.
+    """
     if dest.exists() and (dest / ".git").exists():
         print(f"[=] exists {dest}")
+        _run_bootstrap_install(dest)
         return
 
     subprocess.run(
         ["git", "clone", url, str(dest)],
         check=True,
     )
+
+    _run_bootstrap_install(dest)
 
 
 def _ensure_tree() -> None:
@@ -97,7 +137,6 @@ def _ensure_tree() -> None:
         _mkdir(base)
         for child in children:
             _mkdir(base / child)
-
 
 # ========= FACADE =========
 # This is the *only* surface exposed to Bash.
@@ -130,7 +169,6 @@ class Setup:
         Setup.env()
         Setup.projects()
 
-
 # ========= DISPATCH =========
 
 ACTIONS = {
@@ -139,7 +177,6 @@ ACTIONS = {
     "projects": Setup.projects,
     "all": Setup.all,
 }
-
 
 # ========= ENTRYPOINT =========
 
@@ -158,7 +195,6 @@ def main() -> None:
         ACTIONS[action]()
     except Exception:
         sys.exit(1)
-
 
 if __name__ == "__main__":
     main()

@@ -21,8 +21,28 @@ This repo encodes a *procedure*, not a general solution.
 - `setup.py` contains all setup logic
   - defines *how* each step is performed
 
-The Bash interface is considered stable.
+The Bash interface is considered stable.  
 All implementation details live in Python.
+
+## Repository installs (opt-in)
+
+Repositories cloned by this bootstrap may optionally provide a file named:
+
+```
+
+dev-bootstrap.install.sh
+
+````
+
+If present, this script will be executed after the repository is cloned
+(or revisited on subsequent runs).
+
+This is an **explicit opt-in mechanism**:
+- no guessing
+- no conventions
+- no automatic installs without consent
+
+Repositories without this file are only cloned.
 
 ## Usage
 
@@ -45,15 +65,15 @@ Run specific steps:
 
 All customization lives in `setup.py`.
 
-- Directory structure is defined in `TREE`
-- Git repositories are defined in `ENV_REPOS` and `PROJECT_REPOS`
+* Directory structure is defined in `TREE`
+* Git repositories are defined in `ENV_REPOS` and `PROJECT_REPOS`
 
 To add or remove repositories or folders, edit those mappings directly.
 No other files need to be changed.
-
 
 ## Notes
 
 * Safe to run multiple times
 * Safe to delete `~/dev` and re-run
+* Repositories control their own installation
 * Intentionally boring by design
