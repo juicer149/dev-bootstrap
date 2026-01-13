@@ -40,46 +40,32 @@ from pathlib import Path
 import subprocess
 import sys
 
+
 # =========================================================
 # CONSTANTS
 # =========================================================
 
 BOOTSTRAP_INSTALL_SCRIPT = "dev-bootstrap.install.sh"
 
+
 # =========================================================
-# CONFIGURATION (MVP)
+# CONFIGURATION
 # =========================================================
-#
-# Customization rules:
-#
-# - Directory structure:
-#     Edit TREE
-#     Keys   → top-level directories under ~/dev
-#     Values → subdirectories to create
-#
-# - Git repositories:
-#     Add entries to *_REPOS mappings
-#     Keys   → destination paths
-#     Values → git clone URLs
-#
-# Repositories may optionally provide:
-#
-#     dev-bootstrap.install.sh
-#
-# This script is executed ONLY if the repository was cloned
-# during the current bootstrap invocation.
-#
-# No other parts of this file should need modification.
-#
 
 DEV = Path.home() / "dev"
 # DEV = Path.home() / "test_dev"  # for testing
+
+
+# ---------------------------------------------------------
+# Directory structure
+# ---------------------------------------------------------
 
 TREE = {
     "env": ["shell", "editor", "terminal"],
     "project": ["packages", "sandbox"],
     "tools": [],
 }
+
 
 # ---------------------------------------------------------
 # Repository groups
@@ -91,21 +77,25 @@ TREE = {
 # They represent procedural filters, not ontology.
 # ---------------------------------------------------------
 
+SHELL_REPOS = {
+    DEV / "env/shell": "git@github.com:juicer149/shell-env.git",
+}
+
 EDITOR_REPOS = {
-    DEV / "env/editor/nvim": "git@github.com:lalrak/nvim-config.git",
+    DEV / "env/editor/nvim": "git@github.com:juicer149/nvim-config.git",
 }
 
 TERMINAL_REPOS = {
-    DEV / "env/terminal/wezterm": "git@github.com:lalrak/wezterm-config.git",
-    DEV / "env/terminal/tmux": "git@github.com:lalrak/tmux-config.git",
-    DEV / "env/terminal/ai": "git@github.com:lalrak/ai-env.git",
-    DEV / "env/shell/bash-ui": "git@github.com:lalrak/shell-ui.git",
+    DEV / "env/terminal/wezterm": "git@github.com:juicer149/wezterm-config.git",
+    DEV / "env/terminal/tmux": "git@github.com:juicer149/tmux-config.git",
+    DEV / "env/terminal/ai": "git@github.com:juicer149/ai-env.git",
 }
 
 PROJECT_REPOS = {
     DEV / "project/packages/curate": "git@github.com:juicer149/curate.git",
     DEV / "project/packages/architech": "git@github.com:juicer149/architech.git",
 }
+
 
 # =========================================================
 # LOW-LEVEL MECHANISMS
@@ -181,6 +171,7 @@ def _ensure_tree() -> None:
         for child in children:
             _mkdir(base / child)
 
+
 # =========================================================
 # FACADE
 # This is the *only* surface exposed to Bash.
@@ -192,8 +183,7 @@ class Setup:
 
     Leaf actions:
         - shell
-        - editor
-        - terminal
+        - editor        - terminal
         - projects
 
     Composite actions (orchestration only):
@@ -208,7 +198,7 @@ class Setup:
     @staticmethod
     def shell() -> None:
         _ensure_tree()
-        _process_repos({}, "shell", enabled=False)
+        _process_repos(SHELL_REPOS, "shell")
 
     @staticmethod
     def editor() -> None:
@@ -218,7 +208,7 @@ class Setup:
     @staticmethod
     def terminal() -> None:
         _ensure_tree()
-        _process_repos(TERMINAL_REPOS, "terminal", enabled=False)
+        _process_repos(TERMINAL_REPOS, "terminal")
 
     @staticmethod
     def env() -> None:
@@ -241,6 +231,7 @@ class Setup:
         Setup.env()
         Setup.projects()
 
+
 # =========================================================
 # DISPATCH
 # =========================================================
@@ -254,6 +245,7 @@ ACTIONS = {
     "projects": Setup.projects,
     "all": Setup.all,
 }
+
 
 # =========================================================
 # ENTRYPOINT

@@ -50,7 +50,7 @@ Repositories cloned by this bootstrap **may optionally** provide a file named:
 
 dev-bootstrap.install.sh
 
-````
+```
 
 If present, this script is executed **only when the repository is cloned
 during the current bootstrap run**.
@@ -76,7 +76,7 @@ git clone git@github.com:juicer149/dev-bootstrap.git
 cd dev-bootstrap
 chmod +x bootstrap.sh
 ./bootstrap.sh
-````
+```
 
 ---
 
@@ -92,7 +92,7 @@ Create directory structure only.
 ./bootstrap.sh shell
 ```
 
-Shell environment setup (currently a stub).
+Clone and install the shell environment (shell runtime).
 
 ```bash
 ./bootstrap.sh editor
@@ -104,7 +104,7 @@ Editor setup (e.g. Neovim).
 ./bootstrap.sh terminal
 ```
 
-Terminal setup (currently a stub).
+Terminal setup (tmux, wezterm, related tooling).
 
 ```bash
 ./bootstrap.sh env
@@ -133,6 +133,7 @@ All customization lives in `setup.py`.
 * Directory structure is defined in `TREE`
 * Repositories are defined in:
 
+  * `SHELL_REPOS`
   * `EDITOR_REPOS`
   * `TERMINAL_REPOS`
   * `PROJECT_REPOS`
@@ -148,20 +149,24 @@ This repository defines the **Dev Environment ABI**.
 
 It does not contain configuration logic.
 It defines:
-- directory structure
-- repository boundaries
-- explicit install points
+
+* directory structure
+* repository boundaries
+* explicit install points
 
 Each cloned repository owns its own domain:
-- editors configure editors
-- terminals configure terminals
-- shells configure shells
-- no repository configures another
+
+* shells configure shells
+* editors configure editors
+* terminals configure terminals
+* no repository configures another
 
 Cross-cutting behavior is expressed only via:
-- directory placement
-- explicit install hooks
 
+* directory placement
+* explicit install hooks
+
+---
 
 ## Design notes
 
