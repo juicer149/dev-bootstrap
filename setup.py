@@ -2,95 +2,115 @@
 """
 Bootstrap facade for developer environment setup.
 
-This script is intentionally minimal and procedural.
+This script defines a *stable procedural ABI* for recreating a personal
+development environment.
 
 Architecture
 ------------
-- This file defines a *single facade* (`Setup`) that exposes a small,
-  stable API to Bash.
-- Bash selects *what* to run
-  (tree | shell | editor | terminal | env | projects | all).
-- Python encapsulates *how* it is done.
+- Bash selects *what* procedure to run.
+- Python defines *how* each procedure is executed.
+- The exposed surface is intentionally small and stable.
+
+Actions are divided into:
+- leaf actions      → perform concrete work (clone, mkdir, run scripts)
+- composite actions → orchestrate other actions only
+
+No action performs implicit discovery or guessing.
 
 Design principles
 -----------------
-- No CLI parsing (no argparse, flags, or subcommands)
+- No CLI parsing (no flags, no subcommands, no argparse)
 - No persistent state
-- No configuration language (config is plain Python data)
+- No configuration language (config = Python data)
 - Explicit opt-in for install hooks
 - Idempotent operations where possible
 
 This is NOT:
 - a framework
-- a generic setup tool
+- a general-purpose setup tool
 - a reusable library
 
 This IS:
 - a named procedure
 - safe to run multiple times
-- safe to delete and re-run after wiping ~/dev
-
-If this file grows:
-- new steps go behind new `Setup.<action>()` methods
-- the Bash interface must remain unchanged
+- safe to delete ~/dev and re-run
 """
 
 from pathlib import Path
 import subprocess
 import sys
 
-# ========== CONSTANTS ==========
+# =========================================================
+# CONSTANTS
+# =========================================================
 
 BOOTSTRAP_INSTALL_SCRIPT = "dev-bootstrap.install.sh"
 
-# ========= CONFIG (MVP) =========
+# =========================================================
+# CONFIGURATION (MVP)
+# =========================================================
 #
-# Customization guide:
+# Customization rules:
 #
-# - To add directories:
-#   Edit TREE. Keys are top-level folders under ~/dev.
-#   Values are lists of subdirectories to create.
+# - Directory structure:
+#     Edit TREE
+#     Keys   → top-level directories under ~/dev
+#     Values → subdirectories to create
 #
-# - To add git repositories:
-#   Add entries to *_REPOS mappings.
-#   Keys are destination paths.
-#   Values are git clone URLs.
+# - Git repositories:
+#     Add entries to *_REPOS mappings
+#     Keys   → destination paths
+#     Values → git clone URLs
 #
 # Repositories may optionally provide:
-#   dev-bootstrap.install.sh
-# This script is executed ONLY if the repository was cloned
-# during the current bootstrap run.
 #
-# No other parts of this file need to be modified.
+#     dev-bootstrap.install.sh
+#
+# This script is executed ONLY if the repository was cloned
+# during the current bootstrap invocation.
+#
+# No other parts of this file should need modification.
+#
 
 DEV = Path.home() / "dev"
 # DEV = Path.home() / "test_dev"  # for testing
 
-# Directory tree structure
 TREE = {
     "env": ["shell", "editor", "terminal"],
     "project": ["packages", "sandbox"],
     "tools": [],
 }
 
-# Environment repositories
+# ---------------------------------------------------------
+# Repository groups
+#
+# IMPORTANT SEMANTICS:
+# These mappings group repositories by *which setup step
+# activates them*, not by what they "are".
+#
+# They represent procedural filters, not ontology.
+# ---------------------------------------------------------
+
 EDITOR_REPOS = {
     DEV / "env/editor/nvim": "git@github.com:lalrak/nvim-config.git",
 }
 
 TERMINAL_REPOS = {
     DEV / "env/terminal/wezterm": "git@github.com:lalrak/wezterm-config.git",
+    DEV / "env/terminal/tmux": "git@github.com:lalrak/tmux-config.git",
+    DEV / "env/terminal/ai": "git@github.com:lalrak/ai-env.git",
+    DEV / "env/shell/bash-ui": "git@github.com:lalrak/shell-ui.git",
 }
 
-# Project repositories
 PROJECT_REPOS = {
     DEV / "project/packages/curate": "git@github.com:juicer149/curate.git",
     DEV / "project/packages/architech": "git@github.com:juicer149/architech.git",
-    # add more project repos here
 }
 
-# ========= LOW-LEVEL MECHANISMS =========
-# These functions implement mechanisms, not policy.
+# =========================================================
+# LOW-LEVEL MECHANISMS
+# These implement mechanisms, not policy.
+# =========================================================
 
 def _mkdir(path: Path) -> None:
     path.mkdir(parents=True, exist_ok=True)
@@ -101,8 +121,9 @@ def _git_clone(url: str, dest: Path) -> bool:
     """
     Clone a git repository if it does not already exist.
 
-    Returns True if the repository was cloned during this call,
-    False if it already existed.
+    Returns:
+        True  → repository was cloned during this invocation
+        False → repository already existed
     """
     if dest.exists() and (dest / ".git").exists():
         print(f"[=] exists {dest}")
@@ -117,9 +138,7 @@ def _git_clone(url: str, dest: Path) -> bool:
 
 def _run_bootstrap_install(repo: Path) -> None:
     """
-    Run dev-bootstrap.install.sh if the repository provides it.
-
-    Presence of the file is an explicit opt-in.
+    Run dev-bootstrap.install.sh if the repository explicitly provides it.
     """
     script = repo / BOOTSTRAP_INSTALL_SCRIPT
 
@@ -162,15 +181,24 @@ def _ensure_tree() -> None:
         for child in children:
             _mkdir(base / child)
 
-
-# ========= FACADE =========
+# =========================================================
+# FACADE
 # This is the *only* surface exposed to Bash.
+# =========================================================
 
 class Setup:
     """
     Facade for bootstrap actions.
 
-    Each method represents a named, idempotent setup step.
+    Leaf actions:
+        - shell
+        - editor
+        - terminal
+        - projects
+
+    Composite actions (orchestration only):
+        - env
+        - all
     """
 
     @staticmethod
@@ -196,7 +224,8 @@ class Setup:
     def env() -> None:
         """
         High-level environment setup.
-        Order matters.
+
+        This action performs orchestration only.
         """
         Setup.shell()
         Setup.editor()
@@ -212,8 +241,9 @@ class Setup:
         Setup.env()
         Setup.projects()
 
-
-# ========= DISPATCH =========
+# =========================================================
+# DISPATCH
+# =========================================================
 
 ACTIONS = {
     "tree": Setup.tree,
@@ -225,7 +255,9 @@ ACTIONS = {
     "all": Setup.all,
 }
 
-# ========= ENTRYPOINT =========
+# =========================================================
+# ENTRYPOINT
+# =========================================================
 
 def main() -> None:
     if len(sys.argv) != 2:

@@ -142,6 +142,27 @@ No other files need to be changed.
 
 ---
 
+## Design philosophy
+
+This repository defines the **Dev Environment ABI**.
+
+It does not contain configuration logic.
+It defines:
+- directory structure
+- repository boundaries
+- explicit install points
+
+Each cloned repository owns its own domain:
+- editors configure editors
+- terminals configure terminals
+- shells configure shells
+- no repository configures another
+
+Cross-cutting behavior is expressed only via:
+- directory placement
+- explicit install hooks
+
+
 ## Design notes
 
 * Safe to run multiple times

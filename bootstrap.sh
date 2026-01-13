@@ -1,30 +1,39 @@
 #!/usr/bin/env bash
-# Bootstrap entrypoint for developer environment setup.
+# =========================================================
+# Bootstrap entrypoint (Dev Environment ABI launcher)
+#
+# Role
+# ----
+# This script is the *stable, boring entrypoint* for
+# invoking the developer environment procedure.
 #
 # Responsibilities:
-# - select *what* setup step to run
-# - ensure required system dependencies exist (git, python3)
-# - delegate all logic to setup.py
+#   - Select *which* procedure to run
+#   - Ensure minimal system prerequisites exist
+#   - Delegate all logic to the Python ABI facade
 #
-# Interface:
-#   ./bootstrap.sh [tree|env|projects|all]
+# Non-responsibilities:
+#   - No environment logic
+#   - No configuration
+#   - No discovery or guessing
+#   - No orchestration
 #
-# This file should remain boring.
+# This file must remain boring.
+# =========================================================
 
 set -euo pipefail
 
 ACTION="${1:-all}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# -------------------------------------------------------------------
-# System dependencies
-# -------------------------------------------------------------------
-# Declarative list of required commands.
-# Installation is performed in a single apt invocation if needed.
+# ---------------------------------------------------------
+# System prerequisites
+#
+# These are *bootstrap-level* requirements only.
+# Environment-specific dependencies belong in setup.py
+# or in repository install hooks.
+# ---------------------------------------------------------
 
-# Add any required packages here for the bootstrap process.
-# These should be minimal. Pakages needed for the env setup itself
-# should be handled in setup.py.
 REQUIRED_PKGS=(git python3)
 MISSING_PKGS=()
 
@@ -39,8 +48,8 @@ if [ "${#MISSING_PKGS[@]}" -ne 0 ]; then
   sudo apt install -y "${MISSING_PKGS[@]}"
 fi
 
-# -------------------------------------------------------------------
-# Delegate to Python facade
-# -------------------------------------------------------------------
+# ---------------------------------------------------------
+# Delegate to ABI facade
+# ---------------------------------------------------------
 
 python3 "${SCRIPT_DIR}/setup.py" "${ACTION}"
